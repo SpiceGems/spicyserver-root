@@ -1,0 +1,4 @@
+---
+# handlers file for spicegems.spicyserver-root
+- name: sysctl
+  command: sysctl -p

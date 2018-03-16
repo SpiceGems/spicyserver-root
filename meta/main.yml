@@ -1,0 +1,12 @@
+galaxy_info:
+  author: Varun Batra <codevarun@gmail.com>
+  description: Spicy Servers - The usual installations
+  company: SpiceGems
+  license: license MIT
+  min_ansible_version: 2
+  platforms:
+  - name: Ubuntu
+    versions:
+    - 16.04
+  galaxy_tags: ["spicegems","server setup","root setup","server bootstrap"]
+dependencies: []

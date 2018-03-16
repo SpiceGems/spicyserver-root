@@ -1,0 +1,200 @@
+---
+# tasks file for spicegems.spicyserver-root
+- name: Get number of Processor
+  shell: cat /proc/cpuinfo | grep processor | wc -l
+  register: processor_count
+  tags: processor_count
+- name: Update repositories cache
+  apt: update_cache=yes
+- name: Upgrade all packages to the latest version
+  apt: upgrade=dist
+- name: Update repositories cache and install basic packages
+  apt: name={{item}} state=installed
+  with_items:
+    - bc
+    - ncdu
+    - bison
+    - build-essential
+    - checkinstall
+    - cmake
+    - curl
+    - debconf-utils
+    - dnsmasq
+    - dpkg-dev
+    - fail2ban
+    - git
+    - git-extras
+    - google-perftools
+    - htop
+    - imagemagick
+    - jpegoptim
+    - libatomic-ops-dev
+    - libc6
+    - libcurl4-openssl-dev
+    - libgd2-xpm-dev
+    - libgeoip1
+    - libgeoip-dev
+    - libgoogle-perftools-dev
+    - libmysqlclient-dev
+    - libpcre3
+    - libpcre3-dev
+    - libperl-dev
+    - libssl-dev
+    - libxml2
+    - libxml2-dev
+    - libxslt1-dev
+    - lsb-base
+    - ntp
+    - openssl
+    - optipng
+    - p7zip
+    - python-dev
+    - python-software-properties
+    - software-properties-common
+    - ufw
+    - unzip
+    - vim
+    - vim-gtk
+    - zlib1g
+    - zlib1g-dev
+    - zsh
+    - nmap
+    - libwebkit2gtk-3.0-dev
+- name: Remove useless packages from the cache
+  apt:
+    autoclean: yes
+- name: Remove dependencies that are no longer required
+  apt:
+    autoremove: yes
+- name: get contents of file
+  command: cat /etc/hostname
+  register: hostname
+  become: true # use case specific option
+- name: viewing the contents
+  debug:
+    msg: "{{hostname.stdout}}"
+- copy: content="{{ inventory_hostname }}" dest=/etc/hostname
+- name: get contents of file
+  command: cat /etc/hostname
+  register: hostname
+  become: true # use case specific option
+- name: viewing the contents
+  debug:
+    msg: "{{hostname.stdout}}"
+- name: Added ip to /etc/hosts to avoid hostname lookup error
+  lineinfile:
+    path: /etc/hosts
+    regexp: '^127\.0\.1\.1'
+    line: '127.0.1.1 {{hostname.stdout}}'
+    owner: root
+    group: root
+    mode: 0644
+- name: Added locahost to /etc/hosts
+  lineinfile:
+    path: /etc/hosts
+    regexp: '^127\.0\.0\.1'
+    line: '127.0.0.1 localhost'
+    owner: root
+    group: root
+    mode: 0644
+- name: Override Hostname without Reboot
+  command: hostname {{inventory_hostname}}
+  become: true
+# Networking
+- name: Setting dnsmasq
+  lineinfile:
+    dest: /etc/dnsmasq.conf
+    regexp: "{{ item.regexp }}"
+    line: "{{ item.line }}"
+  with_items:
+    - { regexp: '^cache\-size', line: 'cache-size=500' }
+    - { regexp: '^neg\-ttl', line: 'neg-ttl=5' }
+- service:
+    name: dnsmasq
+    state: restarted
+- service:
+    name: networking
+    state: restarted
+# Manage User
+- group:
+    name: developers
+    state: present
+- name: Adding user "{{USERNAME}}"
+  user:
+    password: "{{ PASS | password_hash('sha512') }}"
+    name: "{{USERNAME}}"
+    groups: sudo,developers
+    shell: /usr/bin/zsh
+    generate_ssh_key: yes
+    ssh_key_bits: 2048
+    ssh_key_file: .ssh/id_rsa
+#SWAP configure
+- name: Create swapfile
+  command: "dd if=/dev/zero of={{ swap_path }} bs={{ dd_bs_size_mb }}M count={{ swap_count }} creates={{ swap_path }}"
+  register: write_swapfile
+- name: Set swapfile permissions
+  file: path="{{ swap_path }}" mode=600
+- name: Build swapfile
+  command: "mkswap {{ swap_path }}"
+  register: create_swapfile
+  when: write_swapfile.changed
+- name: Enable swapfile
+  command: "swapon {{ swap_path }}"
+  when: create_swapfile.changed
+- name: Add swapfile to /etc/fstab
+  lineinfile: dest=/etc/fstab line="{{ swap_path }}   none    swap    sw    0   0" state=present
+- name: Configure swappiness
+  lineinfile: dest=/etc/sysctl.conf line="vm.swappiness = {{ swappiness }}" regexp="^vm.swappiness[\s]?=" state=present
+  notify: sysctl
+  when: swappiness != false
+- name: Configure vm.vfs_cache_pressure
+  lineinfile: dest=/etc/sysctl.conf line="vm.vfs_cache_pressure = {{ vfs_cache_pressure }}" regexp="^vm.vfs_cache_pressure[\s]?=" state=present
+  notify: sysctl
+  when: vfs_cache_pressure != false
+#sysctl
+- name: "Managing Sysctl"
+  sysctl:
+    name: "{{item.name}}"
+    value: "{{item.value}}"
+    state: present
+  with_items:
+    - {name: net.ipv4.tcp_keepalive_time, value: 300}
+    - {name: net.ipv4.tcp_keepalive_probes, value: 5}
+    - {name: net.ipv4.tcp_keepalive_intvl, value: 15}
+    - {name: net.ipv4.tcp_fin_timeout, value: 5}
+    - {name: net.ipv4.tcp_tw_reuse, value: 1}
+    - {name: net.core.somaxconn, value: 65536}
+    - {name: net.core.netdev_max_backlog, value: 65536}
+    - {name: net.core.rmem_max, value: "{{ (ansible_memory_mb.real.total * 1024/2)  | int }}"}
+    - {name: net.core.wmem_max, value: "{{ (ansible_memory_mb.real.total * 1024/2) | int }}"}
+    - {name: net.core.wmem_default, value: "{{ (ansible_memory_mb.real.total * 1024) | int }}"}
+    - {name: net.core.optmem_max, value: "{{ (ansible_memory_mb.real.total * 1024) | int }}"}
+    - {name: fs.file-max, value: "{{ ((processor_count.stdout | int) * 120000) | int }}"}
+#limits
+- name: "Managing Security Limits"
+  pam_limits:
+    domain: "{{item.domain}}"
+    limit_type: "{{item.limit_type}}"
+    limit_item: "{{item.limit_item}}"
+    value: "{{item.value}}"
+  with_items:
+    - {domain: "*", limit_type: soft, limit_item: nofile, value: "{{ (102400 * (processor_count.stdout | int)) }}" }
+    - {domain: "*", limit_type: hard, limit_item: nofile, value: "{{ (102400 * (processor_count.stdout | int)) }}" }
+    - {domain: "*", limit_type: soft, limit_item: nproc, value: "{{ (1024 * (processor_count.stdout | int)) }}" }
+    - {domain: "*", limit_type: hard, limit_item: nproc, value: "{{ (1024 * (processor_count.stdout | int)) }}" }
+# SSH configuration
+- name: Setting SSH
+  lineinfile:
+    dest: /etc/ssh/sshd_config
+    regexp: "{{ item.regexp }}"
+    line: "{{ item.line }}"
+  with_items:
+    # - { regexp: '^PermitRootLogin', line: 'PermitRootLogin no' }
+    - { regexp: '^Port', line: 'Port {{ SSH_PORT }}' }
+    - { regexp: '^UsePAM', line: 'UsePAM yes' }
+    - { regexp: '^UseDNS', line: 'UseDNS no' }
+    - { regexp: '^ClientAliveInterval', line: 'ClientAliveInterval 30' }
+    - { regexp: '^ClientAliveCountMax', line: 'ClientAliveCountMax 100' }
+- service:
+    name: ssh
+    state: restarted

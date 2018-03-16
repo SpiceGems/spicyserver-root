@@ -1,0 +1,19 @@
+---
+# defaults file for spicegems.spicyserver-root
+# New user to create
+USERNAME: "JohnDoe"
+# Password of the user
+PASS: "SomePassword"
+# Port to use for SSH
+SSH_PORT: 22
+# Location of swapfile
+swap_path: "/swapfile"
+# Hosts with low RAM may need to use a small bs size
+dd_bs_size_mb: 256
+# Total size for swapfile
+# Count of how many passes dd should make at bs size
+swap_count: 16
+# How often swap is utilized 0 to 100
+swappiness: 10
+# How often inode info is removed from cache
+vfs_cache_pressure: 50
