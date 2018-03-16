@@ -7,6 +7,6 @@ galaxy_info:
   platforms:
   - name: Ubuntu
     versions:
-    - 16.04
-  galaxy_tags: ["spicegems","server setup","root setup","server bootstrap"]
+    - xenial
+  galaxy_tags: ["system","ubuntu","bootstrap","bootstraping","deployment"]
 dependencies: []
