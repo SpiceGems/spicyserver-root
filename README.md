@@ -1,15 +1,23 @@
 Role Name
 =========
 
-Spin servers with a user added along with networking and file related optimization.
+Spin servers with optimizations:
+
+- SSH configured
+- Swap added
+- User created
+- Network optimized - depending on RAM
+- Limits are lift up - depending on CPU.
+- Some basic packages required by every server - usually!
 
 Requirements
 ------------
 
-Any pre-requisites that may not be covered by Ansible itself or the role should be mentioned here. For instance, if the role uses the EC2 module, it may be a good idea to mention in this section that the boto package is required.
+Nothing really.
 
 Role Variables
 --------------
+```
 # New user to create
 USERNAME: ""
 # Password of the user
@@ -27,7 +35,7 @@ swap_count: 16
 swappiness: 10
 # How often inode info is removed from cache
 vfs_cache_pressure: 50
-
+```
 Dependencies
 ------------
 
